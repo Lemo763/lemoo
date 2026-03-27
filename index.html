@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تحدي ربط الحروف العربية - PRO</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800&family=Poppins:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a; /* لون خلفية أعمق وأكثر احترافية */
+            --board-bg: #1e293b;
+            --hex-default: #e2e8f0; /* لون خلايا سداسية أفتح وأكثر نظافة */
+            --hex-red: #ef4444; /* أحمر أكثر حيوية */
+            --hex-green: #22c55e; /* أخضر أكثر حيوية */
+            --hex-text: #111827;
+            --primary-accent: #3b82f6;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: 'Cairo', sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+            padding-top: 20px;
+        }
+
+        /* لوحة النتائج */
+        .scoreboard {
+            background-color: var(--board-bg);
+            border-radius: 12px;
+            padding: 15px 30px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .score-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 1.1rem;
+        }
+
+        .score-label { font-weight: 800; }
+        .score-value { font-size: 2.2rem; font-family: 'Poppins', sans-serif; font-weight: 700; margin-top: -5px; }
+
+        .team-green .score-label { color: var(--hex-green); }
+        .team-red .score-label { color: var(--hex-red); }
+        .score-divider { font-size: 1.8rem; font-weight: 800; opacity: 0.5; }
+
+        /* منطقة اللعبة */
+        .game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .board-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+            border-radius: 20px;
+            background: var(--board-bg);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            position: relative;
+        }
+
+        /* الحدود الملونة لتوضيح مسار كل فريق */
+        .border-line {
+            position: absolute;
+            background: linear-gradient(90deg, var(--hex-red) 50%, var(--hex-green) 50%);
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .line-top-bottom { top: -8px; left: 0; right: 0; height: 16px; background: var(--hex-green); }
+        .line-bottom { bottom: -8px; top: auto; background: var(--hex-green); }
+        .line-left-right { left: -8px; top: 0; bottom: 0; width: 16px; background: var(--hex-red); }
+        .line-right { right: -8px; left: auto; background: var(--hex-red); }
+
+        .hex-row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: -28px; /* تداخل الصفوف */
+            z-index: 1;
+        }
+
+        /* إزاحة الصفوف الزوجية لتكوين الشبكة */
+        .hex-row:nth-child(even) {
+            margin-right: 58px;
+        }
+
+        .hexagon {
+            width: 105px;
+            height: 115px;
+            background-color: var(--hex-default);
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--hex-text);
+            cursor: pointer;
+            margin: 0 5px;
+            transition: transform 0.2s, background-color 0.4s ease-out, color 0.3s;
+            user-select: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .hexagon:hover {
+            transform: scale(1.08) translateY(-3px);
+            z-index: 10;
+        }
+
+        .hexagon.claimed.green { background-color: var(--hex-green); color: white; cursor: default; }
+        .hexagon.claimed.red { background-color: var(--hex-red); color: white; cursor: default; }
+        
+        .hexagon.winner-highlight { animation: pulse 0.8s infinite; } /* تمييز الخلايا الفائزة */
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+            50% { transform: scale(1.1); box-shadow: 0 0 20px 5px rgba(255, 255, 255, 0.4); }
+        }
+
+        /* زر الريست */
+        .reset-btn-container { margin-top: 25px; }
+        .btn-reset {
+            padding: 12px 24px;
+            background-color: var(--primary-accent);
+            color: white;
+            font-family: 'Cairo', sans-serif;
+            font-weight: bold;
+            font-size: 1.1rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .btn-reset:hover { background-color: #2563eb; }
+        .btn-reset:active { transform: scale(0.98); }
+
+        /* تراكب الفوز (Confetti) */
+        .winner-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none; /* يتم عرضه بالجافاسكربت */
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            flex-direction: column;
+            text-align: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .winner-overlay.active { display: flex; animation: fadeIn 0.3s; }
+        
+        .winner-text {
+            font-size: 4rem;
+            font-weight: 800;
+            color: white;
+            text-shadow: 0 4px 15px rgba(255,255,255,0.4);
+            margin-bottom: 20px;
+            animation: winnerBounce 0.6s ease-out;
+        }
+
+        .winner-text span { font-weight: 800; display: inline-block; animation: textPop 0.4s; }
+        
+        .reset-prompt { font-size: 1.2rem; margin-top: 20px; color: rgba(255,255,255,0.7); }
+
+        /* نافذة السؤال */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 150;
+            visibility: hidden;
+            opacity: 0;
+            transition: 0.3s ease;
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-overlay.active {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .modal {
+            background: white;
+            color: black;
+            padding: 30px;
+            border-radius: 18px;
+            width: 90%;
+            max-width: 450px;
+            text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+        
+        .modal-overlay.active .modal { transform: scale(1); }
+
+        .modal h2 { margin-top: 0; color: #1f2937; font-size: 1.8rem; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
+        .modal-question { margin: 25px 0 15px; font-size: 1.3rem; font-weight: 600; color: #374151; }
+        
+        .answer-box {
+            margin: 15px 0 25px;
+            padding: 18px;
+            background: #f1f5f9;
+            border-radius: 10px;
+            display: none;
+            font-weight: bold;
+            font-size: 1.4rem;
+            color: #111827;
+            border: 2px solid #e2e8f0;
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Cairo', sans-serif;
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+            margin: 6px;
+            transition: 0.2s, transform 0.1s;
+        }
+        .btn:active { transform: scale(0.97); }
+
+        .btn-show { background: var(--primary-accent); color: white; width: calc(100% - 12px); margin-bottom: 20px; }
+        .btn-show:hover { background: #2563eb; }
+        
+        .btn-green { background: var(--hex-green); color: white; flex: 1; }
+        .btn-green:hover { background: #16a34a; }
+        
+        .btn-red { background: var(--hex-red); color: white; flex: 1; }
+        .btn-red:hover { background: #dc2626; }
+        
+        .btn-close { background: #64748b; color: white; width: calc(100% - 12px); margin-top: 15px;}
+        .btn-close:hover { background: #475569; }
+        
+        .action-buttons { display: none; gap: 10px; justify-content: center; }
+
+        @media (max-width: 600px) {
+            .hexagon {
+                width: 75px;
+                height: 82px;
+                font-size: 1.6rem;
+                margin: 0 3px;
+            }
+            .hex-row { margin-bottom: -20px; }
+            .hex-row:nth-child(even) { margin-right: 43px; }
+            .board-container { padding: 8px; border-radius: 15px; }
+            .score-value { font-size: 1.8rem; }
+            .score-label { font-size: 0.9rem; }
+            .scoreboard { padding: 10px 20px; gap: 15px; }
+            .winner-text { font-size: 2.5rem; }
+            .line-left-right { width: 8px; left: -4px; }
+            .line-right { right: -4px; left: auto; }
+            .line-top-bottom { height: 8px; top: -4px; }
+            .line-bottom { bottom: -4px; top: auto; }
+        }
+
+        /* أنيميشن */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes winnerBounce { 
+            0% { transform: scale(0.5); opacity: 0; }
+            60% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+        @keyframes textPop { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-shadow: 0 2px 10px rgba(0,0,0,0.5); margin-bottom: 15px;">تحدي الحروف - PRO</h1>
+
+    <div class="scoreboard">
+        <div class="score-item team-green">
+            <span class="score-label">الأخضر</span>
+            <span class="score-value" id="scoreGreen">0</span>
+        </div>
+        <div class="score-divider"> - </div>
+        <div class="score-item team-red">
+            <span class="score-label">الأحمر</span>
+            <span class="score-value" id="scoreRed">0</span>
+        </div>
+    </div>
+    
+    <div class="game-wrapper">
+        <div class="board-container" id="board">
+            <div class="border-line line-top-bottom"></div>
+            <div class="border-line line-top-bottom line-bottom"></div>
+            <div class="border-line line-left-right"></div>
+            <div class="border-line line-left-right line-right"></div>
+            </div>
+
+        <div class="reset-btn-container">
+            <button class="btn-reset" onclick="resetGame(false)">إعادة جولة جديدة</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h2 id="modalLetter">حرف</h2>
+            <p class="modal-question" id="modalQuestion">نص السؤال يظهر هنا؟</p>
+            
+            <button class="btn btn-show" id="btnShowAnswer" onclick="showAnswer()">إظهار الإجابة</button>
+            
+            <div class="answer-box" id="modalAnswer">نص الإجابة يظهر هنا</div>
+            
+            <div class="action-buttons" id="actionButtons">
+                <button class="btn btn-green" onclick="claimHex('green')">تلوين أخضر</button>
+                <button class="btn btn-red" onclick="claimHex('red')">تلوين أحمر</button>
+            </div>
+            <button class="btn btn-close" id="btnCloseModal" onclick="closeModal()">إغلاق</button>
+        </div>
+    </div>
+
+    <div class="winner-overlay" id="winnerOverlay" onclick="closeResetOverlay()">
+        <div class="winner-text" id="winnerMessage">
+            <span>فوز الفريق</span> <span id="winnerTextTeam">الأخضر</span>
+        </div>
+        <div class="scoreboard" style="background: rgba(255,255,255,0.1);">
+            <div class="score-item" style="color: var(--hex-green);">
+                <span class="score-label">الأخضر</span>
+                <span class="score-value" id="scoreGreenFinal">0</span>
+            </div>
+            <div class="score-divider" style="color: white; opacity: 1;"> - </div>
+            <div class="score-item" style="color: var(--hex-red);">
+                <span class="score-label">الأحمر</span>
+                <span class="score-value" id="scoreRedFinal">0</span>
+            </div>
+        </div>
+        <p class="reset-prompt">أنقر في أي مكان لبدء جولة جديدة</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+        // مصفوفة الأسئلة (يمكنك التعديل عليها وإضافة أسئلتك الخاصة)
+        const questionsData = [
+            { letter: 'أ', question: 'أول حرف هجائي؟', answer: 'ألف' },
+            { letter: 'ب', question: 'عاصمة فرنسا؟', answer: 'باريس' },
+            { letter: 'ت', question: 'فاكهة حمراء اللون؟', answer: 'تفاح' },
+            { letter: 'ث', question: 'حيوان ماكر؟', answer: 'ثعلب' },
+            { letter: 'ج', question: 'سفينة الصحراء؟', answer: 'جمل' },
+            { letter: 'ح', question: 'يستخدم للربط؟', answer: 'حبل' },
+            { letter: 'خ', question: 'يخبز ويؤكل؟', answer: 'خبز' },
+            { letter: 'د', question: 'حيوان يوقظك؟', answer: 'ديك' },
+            { letter: 'ذ', question: 'معدن أصفر غالي؟', answer: 'ذهب' },
+            { letter: 'ر', question: 'فاكهة ذكرت في القرآن؟', answer: 'رمان' },
+            { letter: 'ز', question: 'حيوان طويل العنق؟', answer: 'زرافة' },
+            { letter: 'س', question: 'تستخدم لمعرفة الوقت؟', answer: 'ساعة' },
+            { letter: 'ش', question: 'تشرق في الصباح؟', answer: 'شمس' },
+            { letter: 'ص', question: 'طائر جارح؟', answer: 'صقر' },
+            { letter: 'ض', question: 'حيوان برمائي؟', answer: 'ضفدع' },
+            { letter: 'ط', question: 'وسيلة نقل جوية؟', answer: 'طائرة' },
+            { letter: 'ظ', question: 'حيوان يشبه الغزال؟', answer: 'ظبي' },
+            { letter: 'ع', question: 'عضو الرؤية؟', answer: 'عين' },
+            { letter: 'غ', question: 'طائر أسود اللون؟', answer: 'غراب' },
+            { letter: 'ف', question: 'حيوان ضخم بخرطوم؟', answer: 'فيل' },
+            { letter: 'ق', question: 'يظهر في السماء ليلاً؟', answer: 'قمر' },
+            { letter: 'ك', question: 'أوفى الحيوانات؟', answer: 'كلب' },
+            { letter: 'ل', question: 'حامض ومفيد؟', answer: 'ليمون' },
+            { letter: 'م', question: 'فاكهة صفراء؟', answer: 'موز' }
+        ];
+
+        // ترتيب الشبكة (عدد الخلايا في كل صف لعمل الشكل السداسي المتداخل)
+        const gridLayout = [4, 5, 4, 5, 4];
+        let currentHexId = null;
+        let dataIndex = 0;
+        
+        // النتائج
+        let scoreGreen = 0;
+        let scoreRed = 0;
+        let gameOver = false;
+
+        const board = document.getElementById('board');
+        const hexesDataMap = {}; // خريطة لتخزين بيانات كل خلية
+
+        // بناء الشبكة
+        gridLayout.forEach((count, rowIndex) => {
+            const row = document.createElement('div');
+            row.className = 'hex-row';
+            
+            for (let i = 0; i < count; i++) {
+                if(dataIndex >= questionsData.length) break;
+                
+                const data = questionsData[dataIndex];
+                const hex = document.createElement('div');
+                const hexId = `hex-${rowIndex}-${i}`;
+                hex.className = 'hexagon';
+                hex.id = hexId;
+                hex.textContent = data.letter;
+                
+                // حفظ البيانات
+                hex.dataset.id = hexId;
+                hex.dataset.row = rowIndex;
+                hex.dataset.col = i;
+                hex.dataset.claimedBy = ''; // '', 'green', 'red'
+
+                hex.onclick = () => openModal(hex);
+                
+                row.appendChild(hex);
+                dataIndex++;
+                
+                hexesDataMap[hexId] = { row: rowIndex, col: i, question: data.question, answer: data.answer };
+            }
+            board.appendChild(row);
+        });
+
+        const modalOverlay = document.getElementById('modalOverlay');
+        const winnerOverlay = document.getElementById('winnerOverlay');
+        const modalLetter = document.getElementById('modalLetter');
+        const modalQuestion = document.getElementById('modalQuestion');
+        const modalAnswer = document.getElementById('modalAnswer');
+        const btnShowAnswer = document.getElementById('btnShowAnswer');
+        const actionButtons = document.getElementById('actionButtons');
+        const btnCloseModal = document.getElementById('btnCloseModal');
+
+        function openModal(hexElement) {
+            if(gameOver || hexElement.classList.contains('claimed')) return; // لا تفتح النوافذ إذا انتهت اللعبة أو كانت الخلية ملونة
+            
+            currentHexId = hexElement.dataset.id;
+            const data = hexesDataMap[currentHexId];
+            
+            modalLetter.textContent = `حرف ( ${hexElement.textContent} )`;
+            modalQuestion.textContent = data.question;
+            modalAnswer.textContent = data.answer;
+            
+            // إعادة ضبط النافذة
+            modalAnswer.style.display = 'none';
+            actionButtons.style.display = 'none';
+            btnShowAnswer.style.display = 'block';
+            btnCloseModal.style.display = 'none'; // لا تغلق حتى تختار
+            
+            modalOverlay.classList.add('active');
+        }
+
+        function showAnswer() {
+            modalAnswer.style.display = 'block';
+            btnShowAnswer.style.display = 'none';
+            actionButtons.style.display = 'flex';
+            btnCloseModal.style.display = 'block'; // اسمح بالإغلاق الآن
+        }
+
+        function claimHex(color) {
+            if (currentHexId !== null && !gameOver) {
+                const hexElement = document.getElementById(currentHexId);
+                if(hexElement && !hexElement.classList.contains('claimed')) {
+                    // تلوين الخلية
+                    hexElement.className = 'hexagon claimed ' + color;
+                    hexElement.dataset.claimedBy = color;
+                    
+                    // التحقق من الفوز
+                    if (checkWinner(color)) {
+                        announceWinner(color);
+                    }
+                }
+            }
+            closeModal();
+        }
+
+        function closeModal() {
+            modalOverlay.classList.remove('active');
+            currentHexId = null;
+        }
+
+        // إعلان الفوز
+        function announceWinner(color) {
+            gameOver = true;
+            if(color === 'green') scoreGreen++;
+            else if(color === 'red') scoreRed++;
+            
+            // تحديث النتائج في الأعلى
+            document.getElementById('scoreGreen').textContent = scoreGreen;
+            document.getElementById('scoreRed').textContent = scoreRed;
+            document.getElementById('scoreGreenFinal').textContent = scoreGreen;
+            document.getElementById('scoreRedFinal').textContent = scoreRed;
+            
+            // تحديث نص الفائز
+            const winnerTeam = document.getElementById('winnerTextTeam');
+            winnerTeam.textContent = (color === 'green' ? 'الأخضر' : 'الأحمر');
+            winnerTeam.style.color = (color === 'green' ? 'var(--hex-green)' : 'var(--hex-red)');
+            
+            // إظهار تراكب الفوز
+            winnerOverlay.classList.add('active');
+            
+            // تشغيل تأثير القصاصات (Confetti)
+            confetti({
+                particleCount: 150,
+                spread: 80,
+                origin: { y: 0.6 },
+                colors: [(color === 'green' ? '#22c55e' : '#ef4444'), '#ffffff']
+            });
+        }
+        
+        function closeResetOverlay() {
+            winnerOverlay.classList.remove('active');
+            resetBoard(); // ابدأ جولة جديدة تلقائياً
+        }
+
+        // إعادة ضبط اللعبة (تصفير النتائج) أو الجولة فقط
+        function resetGame(keepScore) {
+            if(!keepScore) {
+                scoreGreen = 0;
+                scoreRed = 0;
+                document.getElementById('scoreGreen').textContent = 0;
+                document.getElementById('scoreRed').textContent = 0;
+            }
+            resetBoard();
+        }
+
+        // إعادة ضبط اللوحة فقط
+        function resetBoard() {
+            gameOver = false;
+            const hexes = document.querySelectorAll('.hexagon');
+            hexes.forEach(hex => {
+                hex.className = 'hexagon'; // مسح الألوان
+                hex.dataset.claimedBy = ''; // مسح البيانات
+            });
+            confetti.reset();
+        }
+
+        // --- خوارزمية تحديد الفوز (تحقق المسار المتصل) ---
+        // في شبكة Hex، عندما ينشأ مسار واحد (أخضر من الأعلى للأسفل)، فإنه يمنع بالضرورة إنشاء مسار منافس (أحمر من اليسار لليمين).
+        
+        function checkWinner(color) {
+            const numRows = gridLayout.length;
+            const claimedHexes = Array.from(document.querySelectorAll(`.hexagon.claimed.${color}`));
+            if (claimedHexes.length < 3) return false; // تحتاج لـ 3 خلايا كحد أدنى
+
+            // بناء خريطة للمسارات (BFS)
+            const graph = {};
+            claimedHexes.forEach(hex => {
+                const row = parseInt(hex.dataset.row);
+                const col = parseInt(hex.dataset.col);
+                const neighbors = getHexNeighbors(row, col);
+                
+                // تحقق من الجيران الملونين بنفس اللون
+                neighbors.forEach(n => {
+                    const neighborId = `hex-${n.row}-${n.col}`;
+                    const neighborElement = document.getElementById(neighborId);
+                    if (neighborElement && neighborElement.dataset.claimedBy === color) {
+                        if (!graph[hex.id]) graph[hex.id] = [];
+                        if (!graph[neighborId]) graph[neighborId] = [];
+                        graph[hex.id].push(neighborId);
+                        graph[neighborId].push(hex.id);
+                    }
+                });
+            });
+
+            // تحقق من المسار للأخضر (أعلى <-> أسفل)
+            if (color === 'green') {
+                const topNodes = claimedHexes.filter(h => parseInt(h.dataset.row) === 0).map(h => h.id);
+                const bottomNodes = claimedHexes.filter(h => parseInt(h.dataset.row) === numRows - 1).map(h => h.id);
+                if (topNodes.length === 0 || bottomNodes.length === 0) return false;
+                return isPath(topNodes, bottomNodes, graph);
+            }
+            // تحقق من المسار للأحمر (يسار <-> يمين)
+            else if (color === 'red') {
+                const leftNodes = claimedHexes.filter(h => parseInt(h.dataset.col) === 0).map(h => h.id);
+                const rightNodes = claimedHexes.filter(h => {
+                    const row = parseInt(h.dataset.row);
+                    const col = parseInt(h.dataset.col);
+                    const colsInRow = gridLayout[row];
+                    return col === colsInRow - 1;
+                }).map(h => h.id);
+                
+                if (leftNodes.length === 0 || rightNodes.length === 0) return false;
+                return isPath(leftNodes, rightNodes, graph);
+            }
+            return false;
+        }
+
+        // البحث عن مسار (BFS)
+        function isPath(startNodes, endNodes, graph) {
+            if (startNodes.length === 0) return false;
+            const visited = new Set();
+            const queue = [...startNodes];
+            queue.forEach(node => visited.add(node));
+
+            while (queue.length > 0) {
+                const currentNode = queue.shift();
+                if (endNodes.includes(currentNode)) return true; // وجدنا مساراً!
+                
+                const neighbors = graph[currentNode] || [];
+                for (const neighbor of neighbors) {
+                    if (!visited.has(neighbor)) {
+                        visited.add(neighbor);
+                        queue.push(neighbor);
+                    }
+                }
+            }
+            return false;
+        }
+
+        // حساب جيران خلية سداسية (معقّد بسبب التداخل)
+        function getHexNeighbors(row, col) {
+            const neighbors = [];
+            
+            // الشبكة متعرجة، الجيران يعتمدون على رقم الصف (زوجي/فردي)
+            if (row % 2 === 0) { // صف فردي (4 خلايا في التصميم)
+                neighbors.push({ row: row - 1, col: col - 1 }, { row: row - 1, col: col });
+                neighbors.push({ row: row + 1, col: col - 1 }, { row: row + 1, col: col });
+            } else { // صف زوجي (5 خلايا في التصميم)
+                neighbors.push({ row: row - 1, col: col }, { row: row - 1, col: col + 1 });
+                neighbors.push({ row: row + 1, col: col }, { row: row + 1, col: col + 1 });
+            }
+            
+            // الجيران على نفس الصف
+            neighbors.push({ row: row, col: col - 1 }, { row: row, col: col + 1 });
+
+            // تصفية الجيران خارج الشبكة
+            return neighbors.filter(n => {
+                if (n.row < 0 || n.row >= gridLayout.length) return false;
+                const colsInRow = gridLayout[n.row];
+                return n.col >= 0 && n.col < colsInRow;
+            });
+        }
+    </script>
+</body>
+</html>
